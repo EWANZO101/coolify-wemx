@@ -8,11 +8,12 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
-      - APP_NAME=WemX
-      - APP_ENV=production
-      - APP_DEBUG=false
+      - APP_NAME=${APP_NAME:-WemX}
+      - APP_ENV=${APP_ENV:-production}
+      - APP_DEBUG=${APP_DEBUG:-false}
       - APP_URL=${APP_URL:-http://localhost}
       - APP_KEY=${APP_KEY}
       - APP_TIMEZONE=${APP_TIMEZONE:-UTC}
@@ -28,7 +29,7 @@ services:
       
       # Mail
       - MAIL_MAILER=${MAIL_MAILER:-smtp}
-      - MAIL_HOST=${MAIL_HOST:-mailpit}
+      - MAIL_HOST=${MAIL_HOST:-mailhog}
       - MAIL_PORT=${MAIL_PORT:-1025}
       - MAIL_USERNAME=${MAIL_USERNAME}
       - MAIL_PASSWORD=${MAIL_PASSWORD}
@@ -42,9 +43,13 @@ services:
       - SESSION_LIFETIME=120
       - SESSION_SECURE_COOKIE=${SESSION_SECURE_COOKIE:-true}
       
+      # Admin User (Optional)
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      
       # Misc
       - LOG_CHANNEL=stack
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=${LOG_LEVEL:-info}
       - BROADCAST_DRIVER=log
       - FILESYSTEM_DISK=local
       - QUEUE_CONNECTION=sync
@@ -52,8 +57,15 @@ services:
     volumes:
       - app_storage:/var/www/html/storage
       - app_cache:/var/www/html/bootstrap/cache
+      - app_logs:/var/www/html/storage/logs
     networks:
       - wemx-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   db:
     image: mariadb:11
@@ -64,12 +76,20 @@ services:
       - MYSQL_DATABASE=${DB_DATABASE:-wemx}
       - MYSQL_USER=${DB_USERNAME:-wemx}
       - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_CHARSET=utf8mb4
+      - MYSQL_COLLATION=utf8mb4_unicode_ci
     volumes:
       - db_data:/var/lib/mysql
     networks:
       - wemx-network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
-  # Optional: MailHog for testing emails
+  # Optional: MailHog for testing emails (disable in production)
   mailhog:
     image: mailhog/mailhog:latest
     container_name: wemx-mailhog
@@ -78,11 +98,14 @@ services:
       - "8025:8025"
     networks:
       - wemx-network
+    profiles:
+      - dev
 
 volumes:
   db_data:
   app_storage:
   app_cache:
+  app_logs:
 
 networks:
   wemx-network:
