@@ -8,7 +8,7 @@ RUN apk add --no-cache \
     zip \
     unzip \
     git \
-    mysql-client \
+    mariadb-client \
     libpng-dev \
     libjpeg-turbo-dev \
     freetype-dev \
@@ -16,6 +16,9 @@ RUN apk add --no-cache \
     icu-dev \
     oniguruma-dev \
     libxml2-dev \
+    autoconf \
+    g++ \
+    make \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
         pdo_mysql \
