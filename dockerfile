@@ -37,18 +37,93 @@ WORKDIR /var/www/html
 # Copy composer files first for better layer caching
 COPY composer.json composer.lock* ./
 
-# Copy configuration files and .env.example BEFORE creating Laravel project
+# Copy configuration files BEFORE creating Laravel project
 COPY docker-nginx.conf /etc/nginx/nginx.conf
 COPY docker-supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker-php.ini /usr/local/etc/php/conf.d/custom.ini
 COPY docker-entrypoint.sh /entrypoint.sh
-COPY .env.example /tmp/.env.example
 
 # Create Laravel project and install WemX
 RUN composer create-project laravel/laravel . --prefer-dist --no-dev \
     && rm -rf database/migrations/* \
-    && composer require wemx/installer dev-web --no-dev \
-    && cp /tmp/.env.example /var/www/html/.env.example
+    && composer require wemx/installer dev-web --no-dev
+
+# Create .env.example with WemX-specific configuration
+RUN cat > .env.example << 'EOF'
+# Application Settings
+APP_NAME=WemX
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://your-domain.com
+APP_KEY=
+APP_TIMEZONE=UTC
+
+# License Key (Required)
+LICENSE_KEY=your-wemx-license-key
+
+# Database Configuration
+DB_CONNECTION=mysql
+DB_HOST=db
+DB_PORT=3306
+DB_DATABASE=wemx
+DB_USERNAME=wemx
+DB_PASSWORD=your-secure-database-password
+DB_ROOT_PASSWORD=your-secure-root-password
+
+# Mail Configuration
+MAIL_MAILER=smtp
+MAIL_HOST=mailhog
+MAIL_PORT=1025
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_ENCRYPTION=
+MAIL_FROM_ADDRESS=hello@your-domain.com
+MAIL_FROM_NAME=WemX
+
+# Cache & Session
+CACHE_DRIVER=file
+SESSION_DRIVER=file
+SESSION_LIFETIME=120
+SESSION_SECURE_COOKIE=true
+
+# Misc Settings
+LOG_CHANNEL=stack
+LOG_LEVEL=debug
+BROADCAST_DRIVER=log
+FILESYSTEM_DISK=local
+QUEUE_CONNECTION=sync
+
+# Admin User (Optional - for automatic creation)
+ADMIN_EMAIL=admin@your-domain.com
+ADMIN_PASSWORD=your-secure-admin-password
+
+# Redis (Optional)
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+# AWS S3 (Optional)
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=
+AWS_USE_PATH_STYLE_ENDPOINT=false
+
+# Pusher (Optional)
+PUSHER_APP_ID=
+PUSHER_APP_KEY=
+PUSHER_APP_SECRET=
+PUSHER_HOST=
+PUSHER_PORT=443
+PUSHER_SCHEME=https
+PUSHER_APP_CLUSTER=mt1
+
+VITE_PUSHER_APP_KEY="${PUSHER_APP_KEY}"
+VITE_PUSHER_HOST="${PUSHER_HOST}"
+VITE_PUSHER_PORT="${PUSHER_PORT}"
+VITE_PUSHER_SCHEME="${PUSHER_SCHEME}"
+VITE_PUSHER_APP_CLUSTER="${PUSHER_APP_CLUSTER}"
+EOF
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html \
