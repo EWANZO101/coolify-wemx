@@ -34,16 +34,22 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Create application directory
 WORKDIR /var/www/html
 
+# Copy composer files first for better layer caching
+COPY composer.json composer.lock* ./
+
 # Create Laravel project and install WemX
 RUN composer create-project laravel/laravel . --prefer-dist --no-dev \
     && rm -rf database/migrations/* \
     && composer require wemx/installer dev-web --no-dev
 
 # Copy configuration files
-COPY docker/nginx.conf /etc/nginx/nginx.conf
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-COPY docker/php.ini /usr/local/etc/php/conf.d/custom.ini
-COPY docker/entrypoint.sh /entrypoint.sh
+COPY docker-nginx.conf /etc/nginx/nginx.conf
+COPY docker-supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY docker-php.ini /usr/local/etc/php/conf.d/custom.ini
+COPY docker-entrypoint.sh /entrypoint.sh
+
+# Copy .env.example for initial setup
+COPY .env.example /var/www/html/.env.example
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html \
@@ -53,6 +59,10 @@ RUN chown -R www-data:www-data /var/www/html \
 
 # Create required directories
 RUN mkdir -p /run/nginx /var/log/nginx /var/log/supervisor
+
+# Health check for Coolify
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost/health || exit 1
 
 # Expose port
 EXPOSE 80
