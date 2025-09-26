@@ -34,9 +34,6 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Create application directory
 WORKDIR /var/www/html
 
-# Copy composer files first for better layer caching
-COPY composer.json composer.lock* ./
-
 # Copy configuration files BEFORE creating Laravel project
 COPY docker-nginx.conf /etc/nginx/nginx.conf
 COPY docker-supervisord.conf /etc/supervisor/conf.d/supervisord.conf
