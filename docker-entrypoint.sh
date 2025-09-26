@@ -1,13 +1,53 @@
 #!/bin/sh
 set -e
 
-echo "Starting WemX initialization..."
+# Colors for better logging
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
-# Wait for database to be ready
-echo "Waiting for database connection..."
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+log_info "Starting WemX initialization..."
+
+# Validate required environment variables
+if [ -z "$LICENSE_KEY" ]; then
+    log_error "LICENSE_KEY environment variable is required!"
+    exit 1
+fi
+
+if [ -z "$DB_PASSWORD" ]; then
+    log_error "DB_PASSWORD environment variable is required!"
+    exit 1
+fi
+
+# Wait for database with timeout
+log_info "Waiting for database connection..."
+DB_RETRIES=30
+DB_RETRY_COUNT=0
+
 until php -r "
 try {
-    \$pdo = new PDO('mysql:host=' . \$_ENV['DB_HOST'] . ';port=' . \$_ENV['DB_PORT'], \$_ENV['DB_USERNAME'], \$_ENV['DB_PASSWORD']);
+    \$pdo = new PDO('mysql:host=' . \$_ENV['DB_HOST'] . ';port=' . \$_ENV['DB_PORT'], \$_ENV['DB_USERNAME'], \$_ENV['DB_PASSWORD'], [
+        PDO::ATTR_TIMEOUT => 5,
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+    ]);
     echo 'Database connection successful' . PHP_EOL;
     exit(0);
 } catch (PDOException \$e) {
@@ -15,18 +55,27 @@ try {
     exit(1);
 }
 "; do
-  echo "Database not ready, waiting..."
+  DB_RETRY_COUNT=$((DB_RETRY_COUNT + 1))
+  if [ $DB_RETRY_COUNT -ge $DB_RETRIES ]; then
+    log_error "Database connection failed after $DB_RETRIES attempts!"
+    exit 1
+  fi
+  log_warning "Database not ready, waiting... (attempt $DB_RETRY_COUNT/$DB_RETRIES)"
   sleep 5
 done
 
+log_success "Database connection established!"
+
 # Generate .env file if it doesn't exist
 if [ ! -f .env ]; then
-    echo "Creating .env file..."
+    log_info "Creating .env file from template..."
     cp .env.example .env
+else
+    log_info "Using existing .env file..."
 fi
 
 # Set environment variables in .env
-echo "Configuring environment..."
+log_info "Configuring environment variables..."
 sed -i "s|APP_NAME=.*|APP_NAME=${APP_NAME:-WemX}|g" .env
 sed -i "s|APP_ENV=.*|APP_ENV=${APP_ENV:-production}|g" .env
 sed -i "s|APP_DEBUG=.*|APP_DEBUG=${APP_DEBUG:-false}|g" .env
@@ -56,67 +105,132 @@ sed -i "s|CACHE_DRIVER=.*|CACHE_DRIVER=${CACHE_DRIVER:-file}|g" .env
 sed -i "s|SESSION_DRIVER=.*|SESSION_DRIVER=${SESSION_DRIVER:-file}|g" .env
 sed -i "s|SESSION_LIFETIME=.*|SESSION_LIFETIME=${SESSION_LIFETIME:-120}|g" .env
 sed -i "s|SESSION_SECURE_COOKIE=.*|SESSION_SECURE_COOKIE=${SESSION_SECURE_COOKIE:-true}|g" .env
+sed -i "s|LOG_LEVEL=.*|LOG_LEVEL=${LOG_LEVEL:-info}|g" .env
 
-# Set license key if provided
-if [ -n "$LICENSE_KEY" ]; then
-    sed -i "s|LICENSE_KEY=.*|LICENSE_KEY=${LICENSE_KEY}|g" .env
-fi
+# Set license key
+sed -i "s|LICENSE_KEY=.*|LICENSE_KEY=${LICENSE_KEY}|g" .env
+log_success "License key configured"
 
 # Generate APP_KEY if not set
 if [ -z "$APP_KEY" ] || ! grep -q "APP_KEY=base64:" .env; then
-    echo "Generating application key..."
+    log_info "Generating application encryption key..."
     php artisan key:generate --force
+    log_success "Application key generated"
+else
+    log_info "Using existing application key"
 fi
 
 # Install dependencies
-echo "Installing dependencies..."
-composer install --optimize-autoloader --no-dev
+log_info "Installing Composer dependencies..."
+if ! composer install --optimize-autoloader --no-dev --no-interaction; then
+    log_error "Failed to install Composer dependencies!"
+    exit 1
+fi
+log_success "Dependencies installed"
 
 # Install WemX
-echo "Installing WemX..."
+log_info "Installing WemX components..."
 if [ ! -f "vendor/wemx/installer/installed" ]; then
-    php artisan wemx:install --force
+    if ! php artisan wemx:install --force; then
+        log_error "Failed to install WemX!"
+        exit 1
+    fi
+    log_success "WemX installed"
+else
+    log_info "WemX already installed, skipping..."
 fi
 
 # Create storage link
-echo "Creating storage link..."
-php artisan storage:link
+log_info "Creating storage symbolic link..."
+php artisan storage:link || log_warning "Storage link already exists or failed to create"
 
 # Set up database
-echo "Setting up database..."
-php artisan migrate --force
+log_info "Running database migrations..."
+if ! php artisan migrate --force; then
+    log_error "Database migration failed!"
+    exit 1
+fi
+log_success "Database migrated"
 
 # Enable modules
-echo "Enabling modules..."
-php artisan module:enable
+log_info "Enabling WemX modules..."
+php artisan module:enable || log_warning "Module enable command failed or no modules to enable"
 
 # Update license
-if [ -n "$LICENSE_KEY" ]; then
-    echo "Setting license key..."
-    php artisan license:update
+log_info "Updating license configuration..."
+if ! php artisan license:update; then
+    log_warning "License update failed - this may be normal on first run"
 fi
 
-# Create first admin user if needed
+# Create first admin user if credentials provided
 if [ -n "$ADMIN_EMAIL" ] && [ -n "$ADMIN_PASSWORD" ]; then
-    echo "Creating admin user..."
-    php artisan user:create --email="$ADMIN_EMAIL" --password="$ADMIN_PASSWORD" --admin
+    log_info "Creating admin user: $ADMIN_EMAIL"
+    if php artisan user:create --email="$ADMIN_EMAIL" --password="$ADMIN_PASSWORD" --admin 2>/dev/null; then
+        log_success "Admin user created successfully"
+    else
+        log_warning "Admin user creation failed - user may already exist"
+    fi
 fi
 
-# Clear and cache config
-echo "Optimizing application..."
+# Clear and cache config for production
+log_info "Optimizing application for production..."
 php artisan config:clear
 php artisan cache:clear
 php artisan view:clear
 php artisan route:clear
-php artisan config:cache
+
+if [ "$APP_ENV" = "production" ]; then
+    php artisan config:cache
+    php artisan route:cache
+    php artisan view:cache
+    log_success "Application optimized for production"
+fi
 
 # Fix permissions
-echo "Setting permissions..."
+log_info "Setting correct file permissions..."
 chown -R www-data:www-data /var/www/html
 chmod -R 755 /var/www/html/storage
 chmod -R 755 /var/www/html/bootstrap/cache
 
-echo "WemX initialization complete!"
+# Add health check route
+log_info "Adding health check routes..."
+if ! grep -q "/health" routes/web.php; then
+    cat << 'EOF' >> routes/web.php
+
+// Health check endpoints for monitoring
+Route::get('/health', function () {
+    $checks = [];
+    $status = 200;
+    
+    try {
+        DB::connection()->getPdo();
+        $checks['database'] = 'ok';
+    } catch (Exception $e) {
+        $checks['database'] = 'error';
+        $status = 503;
+    }
+    
+    $checks['storage'] = is_writable(storage_path()) ? 'ok' : 'error';
+    $checks['cache'] = is_writable(storage_path('framework/cache')) ? 'ok' : 'error';
+    $checks['wemx'] = file_exists(base_path('vendor/wemx')) ? 'installed' : 'missing';
+    
+    return response()->json([
+        'status' => $status === 200 ? 'healthy' : 'unhealthy',
+        'timestamp' => now()->toISOString(),
+        'checks' => $checks
+    ], $status);
+});
+
+Route::get('/ping', function () {
+    return response('pong', 200);
+});
+EOF
+    log_success "Health check routes added"
+fi
+
+log_success "WemX initialization completed successfully!"
+log_info "Application URL: ${APP_URL:-http://localhost}"
+log_info "Admin Email: ${ADMIN_EMAIL:-Not configured}"
 
 # Execute the main command
 exec "$@"
