@@ -49,81 +49,79 @@ RUN composer create-project laravel/laravel . --prefer-dist --no-dev \
     && composer require wemx/installer dev-web --no-dev
 
 # Create .env.example with WemX-specific configuration
-RUN cat > .env.example << 'EOF'
-# Application Settings
-APP_NAME=WemX
-APP_ENV=production
-APP_DEBUG=false
-APP_URL=https://your-domain.com
-APP_KEY=
-APP_TIMEZONE=UTC
-
-# License Key (Required)
-LICENSE_KEY=your-wemx-license-key
-
-# Database Configuration
-DB_CONNECTION=mysql
-DB_HOST=db
-DB_PORT=3306
-DB_DATABASE=wemx
-DB_USERNAME=wemx
-DB_PASSWORD=your-secure-database-password
-DB_ROOT_PASSWORD=your-secure-root-password
-
-# Mail Configuration
-MAIL_MAILER=smtp
-MAIL_HOST=mailhog
-MAIL_PORT=1025
-MAIL_USERNAME=
-MAIL_PASSWORD=
-MAIL_ENCRYPTION=
-MAIL_FROM_ADDRESS=hello@your-domain.com
-MAIL_FROM_NAME=WemX
-
-# Cache & Session
-CACHE_DRIVER=file
-SESSION_DRIVER=file
-SESSION_LIFETIME=120
-SESSION_SECURE_COOKIE=true
-
-# Misc Settings
-LOG_CHANNEL=stack
-LOG_LEVEL=debug
-BROADCAST_DRIVER=log
-FILESYSTEM_DISK=local
-QUEUE_CONNECTION=sync
-
-# Admin User (Optional - for automatic creation)
-ADMIN_EMAIL=admin@your-domain.com
-ADMIN_PASSWORD=your-secure-admin-password
-
-# Redis (Optional)
-REDIS_HOST=127.0.0.1
-REDIS_PASSWORD=null
-REDIS_PORT=6379
-
-# AWS S3 (Optional)
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-AWS_DEFAULT_REGION=us-east-1
-AWS_BUCKET=
-AWS_USE_PATH_STYLE_ENDPOINT=false
-
-# Pusher (Optional)
-PUSHER_APP_ID=
-PUSHER_APP_KEY=
-PUSHER_APP_SECRET=
-PUSHER_HOST=
-PUSHER_PORT=443
-PUSHER_SCHEME=https
-PUSHER_APP_CLUSTER=mt1
-
-VITE_PUSHER_APP_KEY="${PUSHER_APP_KEY}"
-VITE_PUSHER_HOST="${PUSHER_HOST}"
-VITE_PUSHER_PORT="${PUSHER_PORT}"
-VITE_PUSHER_SCHEME="${PUSHER_SCHEME}"
-VITE_PUSHER_APP_CLUSTER="${PUSHER_APP_CLUSTER}"
-EOF
+RUN printf '# Application Settings\n\
+APP_NAME=WemX\n\
+APP_ENV=production\n\
+APP_DEBUG=false\n\
+APP_URL=https://your-domain.com\n\
+APP_KEY=\n\
+APP_TIMEZONE=UTC\n\
+\n\
+# License Key (Required)\n\
+LICENSE_KEY=your-wemx-license-key\n\
+\n\
+# Database Configuration\n\
+DB_CONNECTION=mysql\n\
+DB_HOST=db\n\
+DB_PORT=3306\n\
+DB_DATABASE=wemx\n\
+DB_USERNAME=wemx\n\
+DB_PASSWORD=your-secure-database-password\n\
+DB_ROOT_PASSWORD=your-secure-root-password\n\
+\n\
+# Mail Configuration\n\
+MAIL_MAILER=smtp\n\
+MAIL_HOST=mailhog\n\
+MAIL_PORT=1025\n\
+MAIL_USERNAME=\n\
+MAIL_PASSWORD=\n\
+MAIL_ENCRYPTION=\n\
+MAIL_FROM_ADDRESS=hello@your-domain.com\n\
+MAIL_FROM_NAME=WemX\n\
+\n\
+# Cache & Session\n\
+CACHE_DRIVER=file\n\
+SESSION_DRIVER=file\n\
+SESSION_LIFETIME=120\n\
+SESSION_SECURE_COOKIE=true\n\
+\n\
+# Misc Settings\n\
+LOG_CHANNEL=stack\n\
+LOG_LEVEL=debug\n\
+BROADCAST_DRIVER=log\n\
+FILESYSTEM_DISK=local\n\
+QUEUE_CONNECTION=sync\n\
+\n\
+# Admin User (Optional - for automatic creation)\n\
+ADMIN_EMAIL=admin@your-domain.com\n\
+ADMIN_PASSWORD=your-secure-admin-password\n\
+\n\
+# Redis (Optional)\n\
+REDIS_HOST=127.0.0.1\n\
+REDIS_PASSWORD=null\n\
+REDIS_PORT=6379\n\
+\n\
+# AWS S3 (Optional)\n\
+AWS_ACCESS_KEY_ID=\n\
+AWS_SECRET_ACCESS_KEY=\n\
+AWS_DEFAULT_REGION=us-east-1\n\
+AWS_BUCKET=\n\
+AWS_USE_PATH_STYLE_ENDPOINT=false\n\
+\n\
+# Pusher (Optional)\n\
+PUSHER_APP_ID=\n\
+PUSHER_APP_KEY=\n\
+PUSHER_APP_SECRET=\n\
+PUSHER_HOST=\n\
+PUSHER_PORT=443\n\
+PUSHER_SCHEME=https\n\
+PUSHER_APP_CLUSTER=mt1\n\
+\n\
+VITE_PUSHER_APP_KEY="${PUSHER_APP_KEY}"\n\
+VITE_PUSHER_HOST="${PUSHER_HOST}"\n\
+VITE_PUSHER_PORT="${PUSHER_PORT}"\n\
+VITE_PUSHER_SCHEME="${PUSHER_SCHEME}"\n\
+VITE_PUSHER_APP_CLUSTER="${PUSHER_APP_CLUSTER}"\n' > .env.example
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html \
