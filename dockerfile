@@ -37,19 +37,18 @@ WORKDIR /var/www/html
 # Copy composer files first for better layer caching
 COPY composer.json composer.lock* ./
 
-# Create Laravel project and install WemX
-RUN composer create-project laravel/laravel . --prefer-dist --no-dev \
-    && rm -rf database/migrations/* \
-    && composer require wemx/installer dev-web --no-dev
-
-# Copy configuration files
+# Copy configuration files and .env.example BEFORE creating Laravel project
 COPY docker-nginx.conf /etc/nginx/nginx.conf
 COPY docker-supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker-php.ini /usr/local/etc/php/conf.d/custom.ini
 COPY docker-entrypoint.sh /entrypoint.sh
+COPY .env.example /tmp/.env.example
 
-# Copy .env.example for initial setup
-COPY .env.example /var/www/html/.env.example
+# Create Laravel project and install WemX
+RUN composer create-project laravel/laravel . --prefer-dist --no-dev \
+    && rm -rf database/migrations/* \
+    && composer require wemx/installer dev-web --no-dev \
+    && cp /tmp/.env.example /var/www/html/.env.example
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html \
