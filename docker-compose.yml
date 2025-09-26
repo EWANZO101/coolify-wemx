@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: wemx-app
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - db
+    environment:
+      - APP_NAME=WemX
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_URL=${APP_URL:-http://localhost}
+      - APP_KEY=${APP_KEY}
+      - APP_TIMEZONE=${APP_TIMEZONE:-UTC}
+      - LICENSE_KEY=${LICENSE_KEY}
+      
+      # Database
+      - DB_CONNECTION=mysql
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE:-wemx}
+      - DB_USERNAME=${DB_USERNAME:-wemx}
+      - DB_PASSWORD=${DB_PASSWORD}
+      
+      # Mail
+      - MAIL_MAILER=${MAIL_MAILER:-smtp}
+      - MAIL_HOST=${MAIL_HOST:-mailpit}
+      - MAIL_PORT=${MAIL_PORT:-1025}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_ENCRYPTION=${MAIL_ENCRYPTION}
+      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS:-hello@example.com}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME:-WemX}
+      
+      # Cache & Sessions
+      - CACHE_DRIVER=file
+      - SESSION_DRIVER=file
+      - SESSION_LIFETIME=120
+      - SESSION_SECURE_COOKIE=${SESSION_SECURE_COOKIE:-true}
+      
+      # Misc
+      - LOG_CHANNEL=stack
+      - LOG_LEVEL=debug
+      - BROADCAST_DRIVER=log
+      - FILESYSTEM_DISK=local
+      - QUEUE_CONNECTION=sync
+      
+    volumes:
+      - app_storage:/var/www/html/storage
+      - app_cache:/var/www/html/bootstrap/cache
+    networks:
+      - wemx-network
+
+  db:
+    image: mariadb:11
+    container_name: wemx-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${DB_DATABASE:-wemx}
+      - MYSQL_USER=${DB_USERNAME:-wemx}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - wemx-network
+
+  # Optional: MailHog for testing emails
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: wemx-mailhog
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+    networks:
+      - wemx-network
+
+volumes:
+  db_data:
+  app_storage:
+  app_cache:
+
+networks:
+  wemx-network:
+    driver: bridge
